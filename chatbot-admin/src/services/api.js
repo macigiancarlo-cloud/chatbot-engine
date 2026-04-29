@@ -6,7 +6,7 @@
 
 import axios from "axios";
 
-const BACKEND_URL = "http://localhost:3000/api";
+const BACKEND_URL = "https://chatbot-engine-production.up.railway.app/api";
 
 // Crea un'istanza axios con la chiave API già configurata
 const createApi = (apiKey) =>
