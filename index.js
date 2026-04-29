@@ -15,6 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({ origin: "*" }));
+app.use(express.static("public"));
 app.use(express.json());
 
 // Route chatbot
