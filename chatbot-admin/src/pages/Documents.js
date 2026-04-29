@@ -9,12 +9,13 @@ export default function Documents({ apiKey }) {
   const [loading, setLoading] = useState(false);
   const fileRef = useRef();
 
-  const loadDocs = async () => {
-    const d = await getDocumentStats(apiKey);
-    setDocs(d);
+  const refreshDocs = () => {
+    getDocumentStats(apiKey).then(d => setDocs(d));
   };
 
-  useEffect(() => { loadDocs(); }, [apiKey]);
+  useEffect(() => {
+    getDocumentStats(apiKey).then(d => setDocs(d));
+  }, [apiKey]);
 
   const showAlert = (msg, type = "success") => {
     setAlert({ msg, type });
@@ -28,7 +29,7 @@ export default function Documents({ apiKey }) {
       const res = await uploadText(apiKey, text, filename || "documento.txt");
       showAlert(`✅ ${res.filename} caricato — ${res.chunksCreated} chunk creati`);
       setText(""); setFilename("");
-      loadDocs();
+      refreshDocs();
     } catch (e) {
       showAlert("❌ Errore nel caricamento", "error");
     } finally { setLoading(false); }
@@ -41,7 +42,7 @@ export default function Documents({ apiKey }) {
     try {
       const res = await uploadPdf(apiKey, file);
       showAlert(`✅ ${res.filename} caricato — ${res.chunksCreated} chunk creati`);
-      loadDocs();
+      refreshDocs();
     } catch (e) {
       showAlert("❌ Errore nel caricamento PDF", "error");
     } finally { setLoading(false); }
@@ -51,7 +52,7 @@ export default function Documents({ apiKey }) {
     if (!window.confirm("Eliminare tutti i documenti?")) return;
     await clearDocuments(apiKey);
     showAlert("🗑️ Tutti i documenti eliminati");
-    loadDocs();
+    refreshDocs();
   };
 
   return (
