@@ -10,12 +10,17 @@ const express = require("express");
 const cors = require("cors");
 const routes = require("./src/routes");
 const ragRoutes = require("./src/rag-routes");
+const stripeRoutes = require("./src/stripe-routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({ origin: "*" }));
 app.use(express.static("public"));
+
+// Webhook Stripe deve essere PRIMA di express.json()
+app.use("/api", stripeRoutes);
+
 app.use(express.json());
 
 // Route chatbot
@@ -29,7 +34,7 @@ app.get("/", (req, res) => {
   res.json({
     status: "online",
     service: "MG Launch Chatbot Engine",
-    version: "1.1.0",
+    version: "1.2.0",
     timestamp: new Date().toISOString(),
   });
 });
@@ -50,5 +55,7 @@ app.listen(PORT, () => {
   console.log(`  POST   /api/documents/text`);
   console.log(`  POST   /api/documents/pdf`);
   console.log(`  GET    /api/documents/stats`);
-  console.log(`  DELETE /api/documents\n`);
+  console.log(`  DELETE /api/documents`);
+  console.log(`  POST   /api/create-checkout`);
+  console.log(`  POST   /api/webhook\n`);
 });
