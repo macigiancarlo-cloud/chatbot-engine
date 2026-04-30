@@ -18,9 +18,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({ origin: "*" }));
 app.use(express.static("public"));
 
-// Webhook Stripe deve essere PRIMA di express.json()
-app.use("/api", stripeRoutes);
+// Webhook Stripe DEVE ricevere il body RAW prima di express.json()
+app.post(
+  "/api/webhook",
+  express.raw({ type: "application/json" }),
+  stripeRoutes.webhook
+);
 
+// Da qui in poi il body viene parsato come JSON
 app.use(express.json());
 
 // Route chatbot
@@ -28,6 +33,9 @@ app.use("/api", routes);
 
 // Route documenti RAG
 app.use("/api", ragRoutes);
+
+// Route Stripe (create-checkout)
+app.use("/api", stripeRoutes);
 
 // Health check
 app.get("/", (req, res) => {
