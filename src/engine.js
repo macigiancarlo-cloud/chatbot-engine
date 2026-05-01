@@ -1,5 +1,14 @@
 /**
- * CLAUDE ENGINE - versione corretta con protezione sessioni
+ * CLAUDE ENGINE
+ *
+ * Cuore del sistema. Gestisce:
+ * 1. La comunicazione con l'API di Claude (Haiku 4.5, il più economico)
+ * 2. Lo storico della conversazione per ogni sessione
+ * 3. Il conteggio delle conversazioni per il sistema a crediti
+ * 4. L'integrazione con il sistema RAG per le risposte basate su documenti
+ *
+ * IMPORTANTE: ogni cliente deve usare la propria chiave API Anthropic.
+ * Il sistema non ricade mai sulla chiave del server per evitare costi imprevisti.
  */
 
 const Anthropic = require("@anthropic-ai/sdk").default;
@@ -12,6 +21,19 @@ const MAX_HISTORY = 20;
 const MAX_MESSAGE_LENGTH = 2000;
 
 async function chat(sessionId, userMessage, client) {
+  // Verifica che il cliente abbia configurato la sua chiave API personale.
+  // Non usiamo mai la chiave del server come fallback: ogni cliente paga per sé.
+  const apiKey = client.anthropicKey;
+
+  if (!apiKey) {
+    throw new Error(
+      "Chiave API Anthropic non configurata. Accedi al pannello admin e inserisci la tua chiave API personale per poter usare il chatbot."
+    );
+  }
+
+  // Crea il client Anthropic con la chiave del cliente specifico
+  const anthropic = new Anthropic({ apiKey });
+
   // Tronca messaggi troppo lunghi per evitare sprechi di token
   const safeMessage = userMessage.slice(0, MAX_MESSAGE_LENGTH);
 
@@ -20,17 +42,15 @@ async function chat(sessionId, userMessage, client) {
 
   history.push({ role: "user", content: safeMessage });
 
-  // Mantieni solo gli ultimi MAX_HISTORY messaggi
+  // Mantieni solo gli ultimi MAX_HISTORY messaggi per evitare crescita infinita
   const trimmedHistory = history.slice(-MAX_HISTORY);
 
-  // Aggiorna la history con la versione trimmed per evitare crescita infinita
+  // Aggiorna subito la sessione con la history trimmata
   sessions.set(sessionId, trimmedHistory);
 
+  // Sistema RAG: recupera il contesto dai documenti aziendali su Supabase
   const ragContext = await buildContext(client.id, safeMessage);
   const systemWithContext = client.systemPrompt + ragContext;
-
-  const apiKey = client.anthropicKey || process.env.ANTHROPIC_API_KEY;
-  const anthropic = new Anthropic({ apiKey });
 
   const response = await anthropic.messages.create({
     model: MODEL,

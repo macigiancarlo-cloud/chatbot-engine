@@ -1,0 +1,5 @@
+﻿node_modules
+.env
+.git
+chatbot-admin
+chatbot-admin/node_modules

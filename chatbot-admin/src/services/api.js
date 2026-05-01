@@ -3,10 +3,9 @@
  * Tutte le chiamate al backend passano da qui.
  * Cambia solo BACKEND_URL per puntare al server in produzione.
  */
-
 import axios from "axios";
 
-const BACKEND_URL = "https://chatbot-engine-production.up.railway.app/api";
+const BACKEND_URL = "https://chatbot-engine-lilac-cloud-1014.fly.dev/api";
 
 // Crea un'istanza axios con la chiave API già configurata
 const createApi = (apiKey) =>
