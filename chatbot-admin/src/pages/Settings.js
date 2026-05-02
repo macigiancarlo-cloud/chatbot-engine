@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 
-const BACKEND_URL = "http://localhost:3000/api";
+const BACKEND_URL = "https://chatbot-engine-lilac-cloud-1014.fly.dev/api";
 
 export default function Settings({ apiKey, onKeySaved }) {
   const [anthropicKey, setAnthropicKey] = useState("");
@@ -27,7 +27,6 @@ export default function Settings({ apiKey, onKeySaved }) {
       );
       showAlert("✅ Chiave API impostata. I costi saranno addebitati sul tuo account Anthropic.");
       setAnthropicKey("");
-      // Notifica App.js che la chiave è stata salvata
       if (onKeySaved) onKeySaved();
     } catch (e) {
       showAlert("❌ Errore nel salvataggio della chiave.", "error");

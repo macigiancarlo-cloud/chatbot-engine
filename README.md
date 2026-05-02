@@ -17,8 +17,15 @@ chatbot-engine/          ← Node.js Server (backend)
     rag.js               ← Document system and search / Sistema documenti e ricerca
     rag-routes.js        ← Document upload endpoints / Endpoint caricamento documenti
     routes.js            ← Chatbot endpoints / Endpoint chatbot
+    stripe-routes.js     ← Stripe payments and webhook / Pagamenti Stripe e webhook
     supabase.js          ← Supabase connection / Connessione Supabase
+  public/
+    register.html        ← Client registration page / Pagina registrazione clienti
+    success.html         ← Payment success page / Pagina successo pagamento
+    chatbot-widget.js    ← Embeddable widget / Widget embed
   index.js               ← Server entry point / Punto di ingresso server
+  Dockerfile             ← Docker configuration for Fly.io
+  fly.toml               ← Fly.io deployment configuration
   .env                   ← Environment variables (never share) / Variabili ambiente (non condividere mai)
 
   chatbot-admin/         ← React admin panel (frontend) / Pannello admin React
@@ -32,11 +39,18 @@ chatbot-engine/          ← Node.js Server (backend)
         api.js           ← Backend API calls / Chiamate al backend
       App.js             ← Main app with routing / App principale con routing
       App.css            ← Panel styles / Stili del pannello
-
-chatbot-widget/          ← Embed widget (separate folder) / Widget embed (cartella separata)
-  chatbot-widget.js      ← Script to embed on client site / Script da incollare sul sito cliente
-  test.html              ← Widget test page / Pagina di test del widget
 ```
+
+---
+
+## Production URLs / URL di produzione
+
+| Service / Servizio | URL |
+|---|---|
+| Backend (Fly.io) | https://chatbot-engine-lilac-cloud-1014.fly.dev |
+| Admin Panel (Railway) | https://heartfelt-strength-production-0b0b.up.railway.app |
+| Registration Page | https://chatbot-engine-lilac-cloud-1014.fly.dev/register.html |
+| Widget Script | https://chatbot-engine-lilac-cloud-1014.fly.dev/chatbot-widget.js |
 
 ---
 
@@ -46,6 +60,8 @@ chatbot-widget/          ← Embed widget (separate folder) / Widget embed (cart
 - npm
 - Anthropic account with API credits / Account Anthropic con crediti API (console.anthropic.com)
 - Supabase account / Account Supabase (supabase.com) — free plan is enough / piano gratuito è sufficiente
+- Stripe account / Account Stripe (stripe.com) — for payments / per i pagamenti
+- Gmail account / Account Gmail — for sending welcome emails / per inviare email di benvenuto
 
 ---
 
@@ -56,10 +72,22 @@ The `.env` file in `chatbot-engine` must contain / Il file `.env` in `chatbot-en
 ```
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxx
 PORT=3000
-NODE_ENV=development
+NODE_ENV=production
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=sb_secret_xxxxxxxxxx
+STRIPE_SECRET_KEY=sk_live_xxxxxxxxxx
+STRIPE_PUBLISHABLE_KEY=pk_live_xxxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxx
+STRIPE_PRICE_BASE=price_xxxxxxxxxx
+STRIPE_PRICE_PRO=price_xxxxxxxxxx
+STRIPE_PRICE_BUSINESS=price_xxxxxxxxxx
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-gmail-app-password
+BASE_URL=https://chatbot-engine-lilac-cloud-1014.fly.dev
+ADMIN_URL=https://heartfelt-strength-production-0b0b.up.railway.app
 ```
+
+> ⚠️ Never share the `.env` file or push it to GitHub / Non condividere mai il file `.env` né caricarlo su GitHub.
 
 ---
 
@@ -121,7 +149,7 @@ The client must / Il cliente deve:
 6. Click **Salva chiave API**
 7. Add at least $5 in the **Billing** section / Ricaricare almeno $5 nella sezione **Billing**
 
-From this point, costs are charged to the client's account, not yours / Da questo momento i costi vengono addebitati sull'account del cliente, non sul tuo.
+> ✅ From this point, costs are charged to the client's account, not yours / Da questo momento i costi vengono addebitati sull'account del cliente, non sul tuo.
 
 ---
 
@@ -149,13 +177,13 @@ The chatbot will answer based on the loaded documents / Il chatbot risponderà b
 
 ## Embed Widget / Widget embed per il sito del cliente
 
-The `chatbot-widget.js` file must be hosted on the server. The client pastes one line before the closing `</body>` tag / Il file `chatbot-widget.js` va caricato sul server. Il cliente incolla una riga prima della chiusura del tag `</body>`:
+The client pastes one line before the closing `</body>` tag / Il cliente incolla una riga prima della chiusura del tag `</body>`:
 
 ```html
 <script
-  src="https://your-server.com/chatbot-widget.js"
+  src="https://chatbot-engine-lilac-cloud-1014.fly.dev/chatbot-widget.js"
   data-api-key="chatbot-key-client"
-  data-server="https://your-server.com"
+  data-server="https://chatbot-engine-lilac-cloud-1014.fly.dev"
   data-bot-name="Bot Name"
   data-color="#6c63ff">
 </script>
@@ -166,30 +194,26 @@ The `chatbot-widget.js` file must be hosted on the server. The client pastes one
 | Parameter / Parametro | Description / Descrizione | Example / Esempio |
 |---|---|---|
 | `data-api-key` | Client API key / Chiave API del cliente | `chatbot-key-demo-001` |
-| `data-server` | Backend server URL / URL del server | `https://your-server.com` |
+| `data-server` | Backend server URL / URL del server | `https://chatbot-engine-lilac-cloud-1014.fly.dev` |
 | `data-bot-name` | Bot display name / Nome visualizzato | `Assistente` |
 | `data-color` | Widget primary color / Colore principale | `#6c63ff` |
-
-### Local test / Test in locale
-
-Open `chatbot-widget/test.html` in the browser (double click). The server must be running / Apri il file `chatbot-widget/test.html` con il browser (doppio clic). Il server deve essere avviato.
 
 ---
 
 ## Available Plans / Piani disponibili
 
-| Plan / Piano | Conversations / Conversazioni | Recommended use / Uso consigliato |
+| Plan / Piano | Conversations / Conversazioni | Price / Prezzo |
 |---|---|---|
-| Trial | 5 | First access for new clients / Primo accesso per nuovi clienti |
-| Base | 500 | Small businesses / Piccole aziende |
-| Pro | 1.500 | Medium businesses / Aziende medie |
-| Business | 5.000 | Large businesses / Grandi aziende |
+| Trial | 5 | Free / Gratis |
+| Base | 500 | 29€/mese |
+| Pro | 1.500 | 49€/mese |
+| Business | 5.000 | 149€/mese |
 
 ---
 
-## Adding a New Client / Aggiungere un nuovo cliente
+## Adding a New Client Manually / Aggiungere un nuovo cliente manualmente
 
-Clients are managed directly on Supabase / I clienti sono gestiti direttamente su Supabase.
+Clients are created automatically after payment / I clienti vengono creati automaticamente dopo il pagamento. For manual creation / Per creazione manuale:
 
 1. Go to your Supabase project / Vai nel tuo progetto Supabase
 2. Open the **SQL Editor** / Apri l'**SQL Editor**
@@ -241,6 +265,8 @@ $$ LANGUAGE SQL;
 | GET | `/api/documents/stats` | Document statistics / Statistiche documenti |
 | DELETE | `/api/documents` | Delete all documents / Elimina tutti i documenti |
 | POST | `/api/api-key` | Set Anthropic API key / Imposta chiave API Anthropic |
+| POST | `/api/create-checkout` | Create Stripe checkout session / Crea sessione pagamento Stripe |
+| POST | `/api/webhook` | Stripe webhook endpoint |
 
 All requests require the header / Tutte le richieste richiedono l'header:
 
@@ -253,10 +279,12 @@ x-api-key: chatbot-key-xxx
 ## Roadmap / Prossimi sviluppi
 
 - [x] Supabase integration for document persistence / Integrazione Supabase per persistenza documenti ✅
-- [ ] Production deployment on Railway / Messa in produzione su Railway
-- [ ] Automatic client registration / Registrazione automatica nuovi clienti
-- [ ] Stripe payment integration / Integrazione pagamenti con Stripe
+- [x] Production deployment on Fly.io / Messa in produzione su Fly.io ✅
+- [x] Automatic client registration after payment / Registrazione automatica clienti dopo pagamento ✅
+- [x] Stripe payment integration (live) / Integrazione pagamenti Stripe (live) ✅
+- [x] Admin panel deployed on Railway / Pannello admin su Railway ✅
 - [ ] Vector search for more accurate RAG / Ricerca vettoriale per RAG più preciso
+- [ ] Custom domain / Dominio personalizzato
 
 ---
 
@@ -266,3 +294,4 @@ x-api-key: chatbot-key-xxx
 - Never push to GitHub without adding `.env` to `.gitignore` / Non pubblicare su GitHub senza aggiungere `.env` al `.gitignore`
 - The key `chatbot-key-demo-001` is for local testing only / La chiave `chatbot-key-demo-001` è solo per test locali
 - The `SUPABASE_KEY` is a secret key — never expose it in frontend code / La `SUPABASE_KEY` è una chiave segreta, non esporla mai nel codice frontend
+- Each client uses their own Anthropic API key — costs are never charged to the server owner / Ogni cliente usa la propria chiave API Anthropic, i costi non vengono mai addebitati al proprietario del server

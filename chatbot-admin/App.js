@@ -3,6 +3,7 @@ import "./App.css";
 import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
 import Test from "./pages/Test";
+import Settings from "./pages/Settings";
 
 const DEMO_API_KEY = "chatbot-key-demo-001";
 
@@ -48,6 +49,7 @@ const NAV = [
   { id: "dashboard", icon: "📊", label: "Dashboard" },
   { id: "documents", icon: "📄", label: "Documenti" },
   { id: "test", icon: "💬", label: "Test Chatbot" },
+  { id: "settings", icon: "⚙️", label: "Impostazioni" },
 ];
 
 export default function App() {
@@ -56,7 +58,12 @@ export default function App() {
 
   if (!apiKey) return <Login onLogin={setApiKey} />;
 
-  const pages = { dashboard: <Dashboard apiKey={apiKey} />, documents: <Documents apiKey={apiKey} />, test: <Test apiKey={apiKey} /> };
+  const pages = {
+    dashboard: <Dashboard apiKey={apiKey} />,
+    documents: <Documents apiKey={apiKey} />,
+    test: <Test apiKey={apiKey} />,
+    settings: <Settings apiKey={apiKey} />,
+  };
 
   return (
     <div className="app">

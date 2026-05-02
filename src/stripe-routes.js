@@ -103,29 +103,36 @@ const webhook = async (req, res) => {
     }
 
     // Invia email con chiave API
-    await transporter.sendMail({
-      from: `"MG Launch Chatbot" <${process.env.EMAIL_USER}>`,
-      to: customerEmail,
-      subject: "Benvenuto in MG Launch Chatbot — Le tue credenziali",
-      html: `
-        <h2>Benvenuto, ${customerName}!</h2>
-        <p>Il tuo account è stato creato con successo.</p>
-        <h3>Le tue credenziali:</h3>
-        <p><strong>Chiave API:</strong> <code>${apiKey}</code></p>
-        <p><strong>Piano:</strong> ${planInfo.plan} (${planInfo.limit} conversazioni/mese)</p>
-        <h3>Come iniziare:</h3>
-        <ol>
-          <li>Accedi al pannello admin: <a href="${process.env.ADMIN_URL}">${process.env.ADMIN_URL}</a></li>
-          <li>Inserisci la tua chiave API per accedere</li>
-          <li>Carica i tuoi documenti aziendali</li>
-          <li>Copia il widget sul tuo sito</li>
-        </ol>
-        <p>Per qualsiasi problema contattaci rispondendo a questa email.</p>
-        <p>Il team MG Launch</p>
-      `,
-    });
-
-    console.log(`✅ Nuovo cliente creato: ${customerName} (${planInfo.plan})`);
+    // Il try/catch evita che un errore email faccia crashare il webhook.
+    // Il cliente viene comunque creato su Supabase anche se l'email fallisce.
+    try {
+      await transporter.sendMail({
+        from: `"MG Launch Chatbot" <${process.env.EMAIL_USER}>`,
+        to: customerEmail,
+        subject: "Benvenuto in MG Launch Chatbot — Le tue credenziali",
+        html: `
+          <h2>Benvenuto, ${customerName}!</h2>
+          <p>Il tuo account è stato creato con successo.</p>
+          <h3>Le tue credenziali:</h3>
+          <p><strong>Chiave API:</strong> <code>${apiKey}</code></p>
+          <p><strong>Piano:</strong> ${planInfo.plan} (${planInfo.limit} conversazioni/mese)</p>
+          <h3>Come iniziare:</h3>
+          <ol>
+            <li>Accedi al pannello admin: <a href="${process.env.ADMIN_URL}">${process.env.ADMIN_URL}</a></li>
+            <li>Inserisci la tua chiave API per accedere</li>
+            <li>Carica i tuoi documenti aziendali</li>
+            <li>Copia il widget sul tuo sito</li>
+          </ol>
+          <p>Per qualsiasi problema contattaci rispondendo a questa email.</p>
+          <p>Il team MG Launch</p>
+        `,
+      });
+      console.log(`✅ Nuovo cliente creato: ${customerName} (${planInfo.plan})`);
+    } catch (emailErr) {
+      // L'email è fallita ma il cliente è già stato creato correttamente.
+      // Logghiamo l'errore senza bloccare la risposta a Stripe.
+      console.error(`⚠️ Cliente creato ma email non inviata a ${customerEmail}:`, emailErr.message);
+    }
   }
 
   res.json({ received: true });
