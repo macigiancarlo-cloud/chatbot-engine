@@ -1,5 +1,6 @@
 /**
- * ROUTE DEL CHATBOT - versione corretta con rilettura contatore da Supabase
+ * ROUTE DEL CHATBOT
+ * Gestione errori Anthropic con messaggi specifici per il cliente.
  */
 
 const express = require("express");
@@ -9,6 +10,16 @@ const { chat } = require("./engine");
 const { sessions, incrementConversations, updateAnthropicKey, getClientByApiKey } = require("./database");
 
 const router = express.Router();
+
+// Mappa codici errore Anthropic a codici HTTP appropriati
+const ANTHROPIC_ERROR_CODES = new Set([
+  "MISSING_API_KEY",
+  "INVALID_API_KEY",
+  "RATE_LIMIT",
+  "INSUFFICIENT_CREDITS",
+  "API_OVERLOADED",
+  "API_ERROR",
+]);
 
 // POST /chat
 router.post("/chat", authenticate, async (req, res) => {
@@ -25,8 +36,6 @@ router.post("/chat", authenticate, async (req, res) => {
 
     if (isNewConversation) {
       try {
-        // Rilegge il contatore aggiornato da Supabase prima di incrementare
-        // Questo evita problemi con richieste simultanee
         const freshClient = await getClientByApiKey(client.apiKey);
         if (freshClient.conversationsUsed >= freshClient.conversationsLimit) {
           return res.status(429).json({
@@ -52,6 +61,16 @@ router.post("/chat", authenticate, async (req, res) => {
 
   } catch (error) {
     console.error("Errore nel chat:", error.message);
+
+    // Se l'errore proviene da Anthropic, restituisce il messaggio specifico
+    // così il widget può mostrare un messaggio utile al cliente finale
+    if (error.code && ANTHROPIC_ERROR_CODES.has(error.code)) {
+      return res.status(error.status || 500).json({
+        error: error.message,
+        code: error.code,
+      });
+    }
+
     res.status(500).json({ error: "Errore interno del server. Riprova tra poco." });
   }
 });
@@ -83,6 +102,7 @@ router.delete("/session", authenticate, (req, res) => {
 });
 
 // POST /api-key
+// Valida il formato della chiave prima di salvarla
 router.post("/api-key", authenticate, async (req, res) => {
   const { anthropicKey } = req.body;
   const client = req.client;
@@ -91,6 +111,35 @@ router.post("/api-key", authenticate, async (req, res) => {
     return res.status(400).json({
       error: "Chiave API non valida. Deve iniziare con sk-ant-",
     });
+  }
+
+  // Verifica la chiave con una chiamata reale ad Anthropic prima di salvarla
+  // Questo evita che il cliente salvi una chiave errata o scaduta
+  try {
+    const Anthropic = require("@anthropic-ai/sdk").default;
+    const testClient = new Anthropic({ apiKey: anthropicKey });
+    await testClient.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "test" }],
+    });
+  } catch (error) {
+    const status = error?.status || error?.statusCode;
+    if (status === 401) {
+      return res.status(400).json({
+        error: "Chiave API Anthropic non valida. Verifica la chiave su console.anthropic.com.",
+        code: "INVALID_API_KEY",
+      });
+    }
+    if (status === 402 || (error?.message || "").includes("credit")) {
+      return res.status(400).json({
+        error: "La chiave API è valida ma i crediti Anthropic sono esauriti. Ricarica il tuo account su console.anthropic.com.",
+        code: "INSUFFICIENT_CREDITS",
+      });
+    }
+    // Per altri errori (es. rate limit, timeout) salviamo la chiave comunque
+    // perché potrebbe essere un problema temporaneo
+    console.warn("Verifica chiave API: errore non bloccante:", error.message);
   }
 
   const saved = await updateAnthropicKey(client.id, anthropicKey);

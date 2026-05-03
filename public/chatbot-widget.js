@@ -365,7 +365,9 @@
         sessionId = data.sessionId;
         addMessage(data.reply, "bot");
       } else {
-        addMessage("Spiacente, si è verificato un errore. Riprova.", "bot");
+        // Mostra il messaggio di errore specifico se disponibile
+        const errMsg = data.error || "Spiacente, si è verificato un errore. Riprova.";
+        addMessage(errMsg, "bot");
       }
     } catch (err) {
       typingMsg.remove();

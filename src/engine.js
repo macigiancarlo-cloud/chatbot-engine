@@ -17,62 +17,104 @@ const { buildContext } = require("./rag");
 
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_HISTORY = 20;
-// Limite massimo caratteri per messaggio utente (protezione da input enormi)
 const MAX_MESSAGE_LENGTH = 2000;
+
+// Codici di errore Anthropic con messaggi chiari per il cliente
+function parseAnthropicError(error) {
+  const status = error?.status || error?.statusCode;
+  const message = error?.message || "";
+
+  if (status === 401) {
+    return {
+      code: "INVALID_API_KEY",
+      message: "La chiave API Anthropic non è valida. Accedi al pannello admin e verifica la tua chiave API.",
+      status: 401,
+    };
+  }
+
+  if (status === 429) {
+    return {
+      code: "RATE_LIMIT",
+      message: "Quota API Anthropic esaurita o Rate Limit raggiunto. Attendi qualche minuto o verifica il tuo piano su console.anthropic.com.",
+      status: 429,
+    };
+  }
+
+  if (status === 402 || message.includes("credit") || message.includes("billing")) {
+    return {
+      code: "INSUFFICIENT_CREDITS",
+      message: "Crediti API Anthropic esauriti. Ricarica il tuo account su console.anthropic.com nella sezione Billing.",
+      status: 402,
+    };
+  }
+
+  if (status === 529 || message.includes("overloaded")) {
+    return {
+      code: "API_OVERLOADED",
+      message: "I server Anthropic sono temporaneamente sovraccarichi. Riprova tra qualche secondo.",
+      status: 503,
+    };
+  }
+
+  return {
+    code: "API_ERROR",
+    message: "Errore nella comunicazione con Anthropic. Riprova tra poco.",
+    status: 500,
+  };
+}
 
 async function chat(sessionId, userMessage, client) {
   // Verifica che il cliente abbia configurato la sua chiave API personale.
-  // Non usiamo mai la chiave del server come fallback: ogni cliente paga per sé.
   const apiKey = client.anthropicKey;
 
   if (!apiKey) {
-    throw new Error(
-      "Chiave API Anthropic non configurata. Accedi al pannello admin e inserisci la tua chiave API personale per poter usare il chatbot."
-    );
+    const err = new Error("Chiave API Anthropic non configurata. Accedi al pannello admin e inserisci la tua chiave API personale.");
+    err.code = "MISSING_API_KEY";
+    err.status = 403;
+    throw err;
   }
 
-  // Crea il client Anthropic con la chiave del cliente specifico
   const anthropic = new Anthropic({ apiKey });
-
-  // Tronca messaggi troppo lunghi per evitare sprechi di token
   const safeMessage = userMessage.slice(0, MAX_MESSAGE_LENGTH);
 
   if (!sessions.has(sessionId)) sessions.set(sessionId, []);
   const history = sessions.get(sessionId);
 
   history.push({ role: "user", content: safeMessage });
-
-  // Mantieni solo gli ultimi MAX_HISTORY messaggi per evitare crescita infinita
   const trimmedHistory = history.slice(-MAX_HISTORY);
-
-  // Aggiorna subito la sessione con la history trimmata
   sessions.set(sessionId, trimmedHistory);
 
-  // Sistema RAG: recupera il contesto dai documenti aziendali su Supabase
   const ragContext = await buildContext(client.id, safeMessage);
   const systemWithContext = client.systemPrompt + ragContext;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1000,
-    system: systemWithContext,
-    messages: trimmedHistory,
-  });
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1000,
+      system: systemWithContext,
+      messages: trimmedHistory,
+    });
 
-  const assistantMessage = response.content[0].text;
+    const assistantMessage = response.content[0].text;
+    trimmedHistory.push({ role: "assistant", content: assistantMessage });
+    sessions.set(sessionId, trimmedHistory);
 
-  // Aggiunge la risposta alla history già aggiornata
-  trimmedHistory.push({ role: "assistant", content: assistantMessage });
-  sessions.set(sessionId, trimmedHistory);
-
-  return {
-    message: assistantMessage,
-    sessionId,
-    usage: {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-    },
-  };
+    return {
+      message: assistantMessage,
+      sessionId,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+      },
+    };
+  } catch (error) {
+    // Interpreta l'errore Anthropic e lo rilancia con informazioni chiare
+    const parsed = parseAnthropicError(error);
+    const err = new Error(parsed.message);
+    err.code = parsed.code;
+    err.status = parsed.status;
+    throw err;
+  }
 }
 
 module.exports = { chat };
