@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { uploadText, uploadPdf, getDocumentStats, clearDocuments } from "../services/api";
 
 export default function Documents({ apiKey }) {
@@ -9,13 +9,15 @@ export default function Documents({ apiKey }) {
   const [loading, setLoading] = useState(false);
   const fileRef = useRef();
 
-  const refreshDocs = () => {
-    getDocumentStats(apiKey).then(d => setDocs(d));
-  };
-
-  useEffect(() => {
+  // useCallback evita che refreshDocs venga ricreata ad ogni render
+  // e permette di includerla nelle dipendenze di useEffect senza warning ESLint
+  const refreshDocs = useCallback(() => {
     getDocumentStats(apiKey).then(d => setDocs(d));
   }, [apiKey]);
+
+  useEffect(() => {
+    refreshDocs();
+  }, [refreshDocs]);
 
   const showAlert = (msg, type = "success") => {
     setAlert({ msg, type });
@@ -59,9 +61,7 @@ export default function Documents({ apiKey }) {
     <div>
       <div className="page-title">Documenti</div>
       <div className="page-sub">Carica i documenti aziendali. Il chatbot risponderà basandosi su di essi.</div>
-
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
-
       <div className="card">
         <div className="card-title">📄 Carica testo</div>
         <label>Nome file (opzionale)</label>
@@ -72,7 +72,6 @@ export default function Documents({ apiKey }) {
           {loading ? "Caricamento..." : "Carica testo"}
         </button>
       </div>
-
       <div className="card">
         <div className="card-title">📎 Carica PDF</div>
         <div className="file-drop" onClick={() => fileRef.current.click()}>
@@ -82,7 +81,6 @@ export default function Documents({ apiKey }) {
         </div>
         <input type="file" accept=".pdf" ref={fileRef} style={{ display: "none" }} onChange={handlePdfUpload} />
       </div>
-
       <div className="card">
         <div className="card-title" style={{ justifyContent: "space-between" }}>
           <span>📚 Documenti caricati ({docs?.documents?.length ?? 0})</span>
