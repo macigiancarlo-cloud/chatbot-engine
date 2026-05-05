@@ -52,7 +52,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Errore interno del server." });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n✅ MG Launch Chatbot Engine avviato`);
   console.log(`📡 Server in ascolto su http://localhost:${PORT}`);
   console.log(`🔑 Modalità: ${process.env.NODE_ENV || "development"}\n`);
