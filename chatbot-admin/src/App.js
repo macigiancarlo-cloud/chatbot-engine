@@ -6,7 +6,7 @@ import Test from "./pages/Test";
 import Settings from "./pages/Settings";
 import axios from "axios";
 
-const BACKEND_URL = "http://localhost:3000/api";
+const BACKEND_URL = "https://chatbot-engine-lilac-cloud-1014.fly.dev/api";
 
 function Login({ onLogin }) {
   const [key, setKey] = useState("");

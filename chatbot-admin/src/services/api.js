@@ -63,3 +63,10 @@ export const sendMessage = async (apiKey, message, sessionId = null) => {
   const res = await api.post("/chat", { message, sessionId });
   return res.data;
 };
+
+// Salva la chiave API Anthropic del cliente
+export const saveAnthropicKey = async (apiKey, anthropicKey) => {
+  const api = createApi(apiKey);
+  const res = await api.post('/api-key', { anthropicKey });
+  return res.data;
+};
